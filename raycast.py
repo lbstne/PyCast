@@ -17,12 +17,18 @@ right = Plane(Vector(0,0,1), Vector(0,1,0), Vector(-0.5,0.5,0), 1, 1, Material(1
 
 #cube = RectangularPrism(2, 1, 5, Vector(0,0.5,0), Material(1,0,1, (1,1,1)))
 
-gold = Material(1,0.9,1,(1,0.5,0.4))
+gold = Material(1,0.8,1,(1,0.75,0.4))
+silver = Material(1,0.8,1,(0.9,1,0.9))
+stone = Material(1,0.1,1,(0.95,1,0.95))
 
-ground = Plane(Vector(0,0,1), Vector(1,0,0), Vector(0,0,0),100, 100, Material(1,0,1, (0,1,0)))
-sphere = Sphere(1, Vector(3,1,0), gold)
+left = Plane(Vector(0,0,-1), Vector(0,1,0), Vector(2,0.5,0), 5, 5, silver)
+right = Plane(Vector(0,0,1), Vector(0,1,0), Vector(-2,0.5,0), 5, 5, silver)
 
-objects = [ground, sphere]
+
+ground = Plane(Vector(0,0,1), Vector(1,0,0), Vector(0,0,0),100, 100, stone)
+sphere = Sphere(1, Vector(0,1,0), gold)
+
+objects = [ground, sphere, left, right]
 
 def get_dir_vect(yaw, pitch): #yaw is left-right angle, pitch is angle from horizontal
     x = sin(yaw) * cos(pitch)
@@ -31,20 +37,41 @@ def get_dir_vect(yaw, pitch): #yaw is left-right angle, pitch is angle from hori
 
     return Vector(x, y, z).normalize()
 
-def cast_ray(direction, pos, objects, caster, depth):
-    ray = Line(direction, pos)
+def get_color(point, object):
+    material = object.get_material()
+    material_color = material.get_color()
+
+    brightness = object.get_normal(point).normalize().dot(LIGHT) * 255
+
+    red = max(min(brightness * LIGHT_TEMP[0] * material_color[0], 255), 0)
+    green = max(min(brightness * LIGHT_TEMP[1] * material_color[1], 255), 0)
+    blue = max(min(brightness * LIGHT_TEMP[2] * material_color[2], 255), 0)
+
+    return (red,green,blue)
+
+def get_nearest_intersection(objects, line: Line, caster):
     intersections = []
 
     for object in objects:
-        intersection = object.get_intersection(ray)
+        intersection = object.get_intersection(line)
 
         if intersection is not None and object is not caster:
             intersections.append((intersection, object))
 
     if len(intersections) == 0:
-        return BKGD_COLOR
+        return None
 
     intersection = sorted(intersections)[0]
+
+    return intersection
+
+def cast_ray(direction, pos, objects, caster, depth):
+    ray = Line(direction, pos)
+
+    intersection = get_nearest_intersection(objects, ray, caster)
+
+    if intersection is None:
+        return BKGD_COLOR
 
     collision = ray.get_point(intersection[0])
     object = intersection[1]
@@ -53,10 +80,11 @@ def cast_ray(direction, pos, objects, caster, depth):
     material_color = material.get_color()
 
     brightness = object.get_normal(collision).normalize().dot(LIGHT) * 255
+    shadow_ray = Line(LIGHT, Vector(*collision))
 
-    shadow = cast_ray(LIGHT,  Vector(*collision), objects, object, depth + 1)
+    obstruction = get_nearest_intersection(objects, shadow_ray, object)
 
-    if not shadow == BKGD_COLOR:
+    if not obstruction is None:
         brightness = 0
 
     if depth >= MAX_RECURSION_DEPTH:
@@ -74,6 +102,14 @@ def cast_ray(direction, pos, objects, caster, depth):
     red = max(min(reflect_color[0]*material.get_reflectivity()*material_color[0] + color[0]*(1 - material.get_reflectivity()), 255), 0)
     green = max(min(reflect_color[1]*material.get_reflectivity()*material_color[1] + color[1]*(1 - material.get_reflectivity()), 255), 0)
     blue = max(min(reflect_color[2]*material.get_reflectivity()*material_color[2] + color[2]*(1 - material.get_reflectivity()), 255), 0)
+
+    #red = reflect_color[0]*material.get_reflectivity()*material_color[0] + color[0]*(1 - material.get_reflectivity())
+    #green = reflect_color[1]*material.get_reflectivity()*material_color[1] + color[1]*(1 - material.get_reflectivity())
+    #blue = reflect_color[2]*material.get_reflectivity()*material_color[2] + color[2]*(1 - material.get_reflectivity())
+
+    #lumosity = (red + green + blue) / 3
+
+    #return (max(min(int(lumosity*material_color[0]), 255), 0),max(min(int(lumosity*material_color[1]), 255), 0),max(min(int(lumosity*material_color[2]), 255), 0))
 
     return (red, green, blue)
 
