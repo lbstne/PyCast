@@ -3,10 +3,10 @@ from constants import X_FOV
 from vectors import Vector
 
 class Material:
-    def __init__(self, opacity, reflectivity, diffusion, color):
+    def __init__(self, opacity, reflectivity, refraction, color):
         self.opacity = opacity
         self.reflectivity = reflectivity
-        self.diffusion = diffusion
+        self.refraction = refraction
         self.color = color
 
     def get_opacity(self):
@@ -15,20 +15,57 @@ class Material:
     def get_reflectivity(self):
         return self.reflectivity
 
-    def get_diffusion(self):
-        return self.diffusion
+    def get_refraction(self):
+        return self.refraction
 
     def get_color(self):
         return self.color
 
-class Sphere:
-    def __init__(self, radius, pos: Vector, material: Material):
-        self.radius = radius
+class Line:
+    def __init__(self, direction: Vector, pos: Vector):
+        self.direction = direction
+        self.pos = pos
+
+    def get_pos(self):
+        return self.pos
+
+    def get_dir(self):
+        return self.direction
+
+    def get_point(self, increment):
+        return (self.pos + (increment * self.direction)).get_coords()
+
+class Object:
+    def __init__(self, pos: Vector, material: Material):
         self.pos = pos
         self.material = material
 
     def get_material(self):
+        '''Returns the material of the object'''
         return self.material
+
+    def contains(self, point):
+        '''Returns true if the given point is contained within the object, otherwise it returns false.'''
+        pass
+
+    def get_normal(self, point):
+        '''Returns the normal vector of the object at the given point.'''
+        pass
+
+    def get_intersection(self, line: Line):
+        '''
+        Returns the t value of the closest intersection between a given line and the object.
+        
+        t is the smallest postive real number and r is a point on both the line and object
+        for the line 'r = r_0 + tm', where r and r_0 are points on the line and m is a direction vector.
+        '''
+        pass
+
+
+class Sphere(Object):
+    def __init__(self, radius, pos: Vector, material: Material):
+        super(Sphere, self).__init__(pos, material)
+        self.radius = radius
 
     def contains(self, point):
         x,y,z = point
@@ -40,7 +77,7 @@ class Sphere:
         h,k,l = self.pos.get_coords()
         return Vector(x-h,y-k,z-l)
 
-    def get_intersection(self, line):
+    def get_intersection(self, line: Line):
         x,y,z = line.get_pos().get_coords()
         a,b,c = line.get_dir().get_coords()
         h,k,l = self.pos.get_coords()
@@ -64,7 +101,7 @@ class Sphere:
         if len(intersections) == 0:
             return None
         else:
-            return line.get_point(min(intersections))
+            return min(intersections)
 
         ''' sympy code for generating the expression to calculate the intersections of the line and sphere
         
@@ -83,17 +120,15 @@ class Sphere:
 
         solve(eq_sphere, t)'''
                  
-class Plane:
+class Plane(Object):
     def __init__(self, dir1: Vector, dir2: Vector, pos: Vector, length, width, material: Material):
+        super(Plane, self).__init__(pos, material)
         self.dir1 = dir1.normalize()
         self.dir2 = dir2.normalize()
         self.pos = pos
         self.length = length
         self.width = width
         self.material = material
-
-    def get_material(self):
-        return self.material
 
     def get_normal(self, point):
         return self.dir1.cross(self.dir2)
@@ -109,7 +144,7 @@ class Plane:
         D = self.get_translation()
         x,y,z = point
 
-        if abs(A*x + B*y + C*y + D) < 0.001:
+        if A*x + B*y + C*y + D == 0:
             return True
         else:
             return False
@@ -130,15 +165,15 @@ class Plane:
         if type(m) is complex:
             return None
 
-        point = line.get_point(m)
+        point = Vector(*line.get_point(m))
 
         dir1 = self.dir1
         dir2 = self.dir2
 
         pos = self.pos
 
-        dist_dir1 = (dir1.cross(Vector(*point) - pos)).get_mag() / dir1.get_mag()
-        dist_dir2 = (dir2.cross(Vector(*point) - pos)).get_mag() / dir2.get_mag()
+        dist_dir1 = (dir1.cross(point - pos)).get_mag() / dir1.get_mag()
+        dist_dir2 = (dir2.cross(point - pos)).get_mag() / dir2.get_mag()
 
         '''a1, a2, a3 = self.dir1.get_coords()
         b1, b2, b3 = self.dir2.get_coords()
@@ -147,7 +182,7 @@ class Plane:
         t = (x - s*a1) / b1'''
 
         if m > 0 and dist_dir1 <= self.width/2 and dist_dir2 <= self.length/2:
-            return point
+            return m
         else:
             return None
 
@@ -207,17 +242,4 @@ class RectangularPrism:
 
         return Vector(1,1,1)
 
-            
-class Line:
-    def __init__(self, direction: Vector, pos: Vector):
-        self.direction = direction
-        self.pos = pos
-
-    def get_pos(self):
-        return self.pos
-
-    def get_dir(self):
-        return self.direction
-
-    def get_point(self, increment):
-        return (self.pos + (increment * self.direction)).get_coords()
+        

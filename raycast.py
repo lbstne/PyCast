@@ -1,6 +1,6 @@
 import pygame
 from constants import *
-from objects import Line, Material, Plane, RectangularPrism, Sphere
+from objects import Line, Material, Plane, Sphere
 from vectors import Vector
 from math import pi, sin, cos
 
@@ -17,8 +17,10 @@ right = Plane(Vector(0,0,1), Vector(0,1,0), Vector(-0.5,0.5,0), 1, 1, Material(1
 
 #cube = RectangularPrism(2, 1, 5, Vector(0,0.5,0), Material(1,0,1, (1,1,1)))
 
+gold = Material(1,0.9,1,(1,0.5,0.4))
+
 ground = Plane(Vector(0,0,1), Vector(1,0,0), Vector(0,0,0),100, 100, Material(1,0,1, (0,1,0)))
-sphere = Sphere(1, Vector(3,1,0), Material(1,0,1, (1,1,1)))
+sphere = Sphere(1, Vector(3,1,0), gold)
 
 objects = [ground, sphere]
 
@@ -39,47 +41,42 @@ def cast_ray(direction, pos, objects, caster, depth):
         if intersection is not None and object is not caster:
             intersections.append((intersection, object))
 
-    #Find the closest intersection
-    if not len(intersections) == 0:
-        collision = intersections[0][0]
-        object = intersections[0][1]
+    if len(intersections) == 0:
+        return BKGD_COLOR
 
-        for intersection in intersections:
-            if (Vector(*intersection[0]) - pos).get_mag() < (Vector(*collision) - pos).get_mag():
-                collision = intersection[0]
-                object = intersection[1]
+    intersection = sorted(intersections)[0]
 
-        material = object.get_material()
-        material_color = material.get_color()
+    collision = ray.get_point(intersection[0])
+    object = intersection[1]
 
-        diffuse_brightness = object.get_normal(collision).normalize().dot(LIGHT) * 255
+    material = object.get_material()
+    material_color = material.get_color()
 
-        shadow_ray = Line(LIGHT, Vector(*collision))
+    brightness = object.get_normal(collision).normalize().dot(LIGHT) * 255
 
-        if depth >= MAX_RECURSION_DEPTH:
-            return (max(min(diffuse_brightness * LIGHT_TEMP[0] * material_color[0], 255), 0), max(min(diffuse_brightness * LIGHT_TEMP[1] * material_color[1], 255), 0), max(min(diffuse_brightness * LIGHT_TEMP[2] * material_color[2], 255), 0))
+    shadow = cast_ray(LIGHT,  Vector(*collision), objects, object, depth + 1)
 
-        for obstruction in objects:
-            if obstruction.get_intersection(shadow_ray) is not None and obstruction is not object:
-                diffuse_brightness = 0
-                break
+    if not shadow == BKGD_COLOR:
+        brightness = 0
 
-        diffuse_color = (diffuse_brightness * LIGHT_TEMP[0] * material_color[0], diffuse_brightness * LIGHT_TEMP[1] * material_color[1], diffuse_brightness * LIGHT_TEMP[2] * material_color[2])
+    if depth >= MAX_RECURSION_DEPTH:
+        return (max(min(brightness * LIGHT_TEMP[0] * material_color[0], 255), 0), max(min(brightness * LIGHT_TEMP[1] * material_color[1], 255), 0), max(min(brightness * LIGHT_TEMP[2] * material_color[2], 255), 0))
 
-        reflect_dir = direction - 2*(object.get_normal(collision).normalize().dot(direction))*object.get_normal(collision).normalize()
+    color = (brightness * LIGHT_TEMP[0] * material_color[0], brightness * LIGHT_TEMP[1] * material_color[1], brightness * LIGHT_TEMP[2] * material_color[2])
 
-        if not material.get_reflectivity() == 0:
-            reflect_color = cast_ray(reflect_dir, Vector(*collision), objects, object, depth + 1) 
-        else:
-            reflect_color = (0,0,0)
+    reflect_dir = direction - 2*(object.get_normal(collision).normalize().dot(direction))*object.get_normal(collision).normalize()
 
-        red = max(min(reflect_color[0]*material.get_reflectivity()*material_color[0] + diffuse_color[0]*(1 - material.get_reflectivity()), 255), 0)
-        green = max(min(reflect_color[1]*material.get_reflectivity()*material_color[1] + diffuse_color[1]*(1 - material.get_reflectivity()), 255), 0)
-        blue = max(min(reflect_color[2]*material.get_reflectivity()*material_color[2] + diffuse_color[2]*(1 - material.get_reflectivity()), 255), 0)
+    if not material.get_reflectivity() == 0:
+        reflect_color = cast_ray(reflect_dir, Vector(*collision), objects, object, depth + 1) 
+    else:
+        reflect_color = (0,0,0)
 
-        return (red, green, blue)
+    red = max(min(reflect_color[0]*material.get_reflectivity()*material_color[0] + color[0]*(1 - material.get_reflectivity()), 255), 0)
+    green = max(min(reflect_color[1]*material.get_reflectivity()*material_color[1] + color[1]*(1 - material.get_reflectivity()), 255), 0)
+    blue = max(min(reflect_color[2]*material.get_reflectivity()*material_color[2] + color[2]*(1 - material.get_reflectivity()), 255), 0)
 
-    return BKGD_COLOR
+    return (red, green, blue)
+
 
 def cast_rays(start_pos, start_angle):
     start_yaw = start_angle[0]
