@@ -3,10 +3,11 @@ from constants import X_FOV
 from vectors import Vector
 
 class Material:
-    def __init__(self, opacity, reflectivity, refraction, color):
+    def __init__(self, opacity, reflectivity, refraction, roughness, color):
         self.opacity = opacity
         self.reflectivity = reflectivity
         self.refraction = refraction
+        self.roughness = roughness
         self.color = color
 
     def get_opacity(self):
@@ -17,6 +18,9 @@ class Material:
 
     def get_refraction(self):
         return self.refraction
+
+    def get_roughness(self):
+        return self.roughness
 
     def get_color(self):
         return self.color
